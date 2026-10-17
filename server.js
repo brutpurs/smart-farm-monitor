@@ -149,14 +149,6 @@ function requireDashAuth(req, res) {
 }
 
 // ---------- HTTP ----------
-const PWA_FILES = {
-  '/manifest.webmanifest':          ['manifest.webmanifest', 'application/manifest+json', 'no-cache'],
-  '/sw.js':                         ['sw.js', 'application/javascript; charset=utf-8', 'no-cache'],
-  '/icons/icon-192.png':            ['icons/icon-192.png', 'image/png', 'public, max-age=86400'],
-  '/icons/icon-512.png':            ['icons/icon-512.png', 'image/png', 'public, max-age=86400'],
-  '/icons/icon-maskable-512.png':   ['icons/icon-maskable-512.png', 'image/png', 'public, max-age=86400'],
-  '/icons/apple-touch-icon.png':    ['icons/apple-touch-icon.png', 'image/png', 'public, max-age=86400'],
-};
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -164,16 +156,6 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/healthz') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     return res.end('ok');
-  }
-
-  // App-install files (contain nothing private), served without login so the phone can install the app
-  const pwa = PWA_FILES[url.pathname];
-  if (pwa) {
-    return fs.readFile(path.join(__dirname, 'public', pwa[0]), (err, data) => {
-      if (err) { res.writeHead(404); return res.end('Not found'); }
-      res.writeHead(200, { 'Content-Type': pwa[1], 'Cache-Control': pwa[2] });
-      res.end(data);
-    });
   }
 
   if (!requireDashAuth(req, res)) return;
