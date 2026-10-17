@@ -1,0 +1,17 @@
+
+{
+  "name": "esp32-monitor-server",
+  "version": "1.0.0",
+  "description": "WebSocket server for ESP32 temperature, humidity and soil moisture monitoring",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Smart Farm Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #070b12;
+    --surface: rgba(255,255,255,.045);
+    --surface-2: rgba(255,255,255,.075);
+    --border: rgba(255,255,255,.09);
+    --text: #eef2f7;
+    --muted: #8b97a9;
+    --temp: #ff8a4c;
+    --hum: #4cc9f0;
+    --soil: #5eead4;
+    --ok: #34d399;
+    --danger: #ff4d6a;
+    --radius: 22px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { color-scheme: dark; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overflow-x: hidden; }
+  body {
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background:
+      radial-gradient(900px 500px at 12% -10%, rgba(76,201,240,.14), transparent 60%),
+      radial-gradient(800px 500px at 100% 0%, rgba(94,234,212,.10), transparent 60%),
+      radial-gradient(700px 500px at 50% 110%, rgba(255,138,76,.08), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+    color: var(--text);
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1160px; margin: 0 auto;
+    padding: max(28px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(56px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  }
+
+  /* Header */
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center;
+    background: linear-gradient(135deg, #34d399, #4cc9f0); box-shadow: 0 8px 28px rgba(76,201,240,.3);
+  }
+  .logo svg { width: 24px; height: 24px; }
+  h1 { font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+  .sub { font-size: 13px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--border); font-size: 13px; font-weight: 500; backdrop-filter: blur(12px);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+  .pill.live .dot { background: var(--ok); box-shadow: 0 0 0 0 rgba(52,211,153,.6); animation: ping 1.8s infinite; }
+  @keyframes ping { 70% { box-shadow: 0 0 0 9px rgba(52,211,153,0); } 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); } }
+
+  /* Alarm banner */
+  .banner {
+    display: none; align-items: center; gap: 14px; padding: 16px 20px; margin-bottom: 20px; border-radius: 18px;
+    background: linear-gradient(90deg, rgba(255,77,106,.22), rgba(255,77,106,.08)); border: 1px solid rgba(255,77,106,.5);
+    animation: glow 1.6s ease-in-out infinite;
+  }
+  .banner.show { display: flex; }
+  .banner svg { flex: none; }
+  .banner b { font-size: 15px; }
+  .banner span { color: #ffc2cc; font-size: 13px; }
+  @keyframes glow { 50% { box-shadow: 0 0 34px rgba(255,77,106,.35); } }
+
+  /* Cards */
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(4, 1fr); }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px;
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); position: relative; overflow: hidden;
+    transition: transform .25s ease, border-color .25s ease;
+  }
+  @media (hover: hover) { .card:hover { transform: translateY(-3px); border-color: rgba(255,255,255,.18); } }
+  .card::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(260px 120px at 50% 0%, var(--tint, transparent), transparent 70%); opacity: .18;
+  }
+  .label { font-size: 12px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .label i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); display: inline-block; }
+
+  .gauge { position: relative; width: min(100%, 150px); aspect-ratio: 1; margin: 18px auto 4px; container-type: inline-size; }
+  .gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+  .gauge circle { fill: none; stroke-width: 11; stroke-linecap: round; }
+  .gauge .track { stroke: rgba(255,255,255,.07); }
+  .gauge .bar { stroke: var(--c); stroke-dasharray: 339.3; stroke-dashoffset: 339.3; transition: stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1), stroke .3s; }
+  .gauge .val { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+  .gauge .num { font-size: 30px; font-size: 22.5cqw; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .gauge .num small { font-size: 14px; font-size: 10cqw; font-weight: 500; color: var(--muted); margin-left: 2px; }
+  .hint { text-align: center; font-size: 12.5px; color: var(--muted); margin-top: 8px; min-height: 18px; }
+
+  .card.temp  { --c: var(--temp); --tint: var(--temp); }
+  .card.hum   { --c: var(--hum);  --tint: var(--hum); }
+  .card.soil  { --c: var(--soil); --tint: var(--soil); }
+  .card.alarm { --c: var(--ok);   --tint: var(--ok); display: flex; flex-direction: column; }
+  .card.alarm.on { --c: var(--danger); --tint: var(--danger); border-color: rgba(255,77,106,.55); }
+  .card.temp.hot { border-color: rgba(255,77,106,.55); --c: var(--danger); }
+
+  .status { flex: 1; display: grid; place-content: center; text-align: center; gap: 10px; padding: 14px 0; }
+  .status .icon {
+    width: 72px; height: 72px; border-radius: 50%; margin: 0 auto; display: grid; place-items: center;
+    background: rgba(52,211,153,.14); color: var(--ok); border: 1px solid rgba(52,211,153,.35);
+  }
+  .alarm.on .status .icon { background: rgba(255,77,106,.16); color: var(--danger); border-color: rgba(255,77,106,.5); animation: shake .5s infinite; }
+  @keyframes shake { 25% { transform: rotate(-9deg); } 75% { transform: rotate(9deg); } }
+  .status svg { width: 32px; height: 32px; }
+  .status .t { font-size: 20px; font-weight: 700; }
+  .status .d { font-size: 12.5px; color: var(--muted); }
+
+  button.mute {
+    width: 100%; min-height: 48px; padding: 13px 16px; touch-action: manipulation; border-radius: 14px; border: 1px solid var(--border); cursor: pointer;
+    font: inherit; font-weight: 600; font-size: 14px; color: var(--text); background: var(--surface-2); transition: .2s;
+  }
+  @media (hover: hover) { button.mute:hover:not(:disabled) { background: rgba(255,255,255,.14); transform: translateY(-1px); } }
+  button.mute:active:not(:disabled) { transform: scale(.98); }
+  button.mute:disabled { opacity: .4; cursor: not-allowed; }
+  button.mute.active { background: linear-gradient(135deg, #ff4d6a, #ff8a4c); border-color: transparent; box-shadow: 0 10px 26px rgba(255,77,106,.35); }
+  button.mute:focus-visible { outline: 2px solid var(--hum); outline-offset: 2px; }
+
+  /* Chart + table */
+  .row { display: grid; gap: 18px; grid-template-columns: 1fr; margin-top: 18px; }
+  .card.wide { padding: 24px; }
+  .card.wide:hover { transform: none; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .head h2 { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12.5px; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; background: var(--c); vertical-align: -1px; }
+  canvas { width: 100%; height: clamp(180px, 32vw, 240px); display: block; }
+
+  .tablewrap { -webkit-overflow-scrolling: touch; overflow-x: auto; max-height: 420px; overflow-y: auto; border-radius: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th { position: sticky; top: 0; background: #0e1522; text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; padding: 11px 14px; z-index: 1; }
+  td { padding: 12px 14px; border-top: 1px solid var(--border); white-space: nowrap; }
+  tbody tr { transition: background .15s; }
+  tbody tr:hover { background: rgba(255,255,255,.04); }
+  .tag { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .tag.ok { background: rgba(52,211,153,.14); color: var(--ok); }
+  .tag.bad { background: rgba(255,77,106,.16); color: var(--danger); }
+  .empty { text-align: center; color: var(--muted); padding: 30px; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 30px; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 1024px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+
+  /* Phones and small tablets */
+  @media (max-width: 640px) {
+    .wrap {
+      padding: max(18px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+    }
+    header { margin-bottom: 18px; }
+    h1 { font-size: 18px; }
+    .logo { width: 40px; height: 40px; border-radius: 12px; }
+    .grid { gap: 12px; }
+    .row { gap: 12px; margin-top: 12px; }
+    .card { padding: 16px; border-radius: 18px; }
+    .card.wide { padding: 16px; }
+    .gauge { margin-top: 12px; width: min(100%, 124px); }
+    .hint { font-size: 12px; }
+    .status { padding: 6px 0 12px; gap: 6px; }
+    .status .icon { width: 56px; height: 56px; }
+    .status svg { width: 26px; height: 26px; }
+    .status .t { font-size: 17px; }
+    .status .d { display: none; }
+    button.mute { padding: 10px 8px; font-size: 13px; }
+    .dt { display: none; }
+    .banner { padding: 12px 14px; border-radius: 14px; }
+    th, td { padding: 10px 6px; font-size: 12px; }
+    th:first-child, td:first-child { padding-left: 4px; }
+    td .tag { display: inline-block; width: 10px; height: 10px; padding: 0; font-size: 0; border-radius: 50%; background: currentColor; }  /* status becomes a dot */
+    th:nth-child(2), td:nth-child(2) { display: none; }  /* hide Device column on phones */
+    .tablewrap { max-height: 340px; }
+    footer { margin-top: 22px; }
+  }
+
+  /* Very small phones */
+  @media (max-width: 340px) {
+    .grid { grid-template-columns: 1fr; }
+    .card.alarm { grid-column: auto; }
+    .gauge { width: min(100%, 140px); }
+  }
+
+  /* Phones turned sideways */
+  @media (max-height: 520px) and (orientation: landscape) {
+    .grid { grid-template-columns: repeat(4, 1fr); }
+    .card.alarm { grid-column: auto; }
+    .gauge { width: min(100%, 92px); margin-top: 8px; }
+    .status .icon { width: 44px; height: 44px; }
+    .status .d { display: none; }
+    canvas { height: 160px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#06231f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V10"/><path d="M12 10C12 6 9 3 4 3c0 5 3 7 8 7z"/><path d="M12 13c0-3.5 2.6-6 7-6 0 4.4-2.6 6.5-7 6.5z"/></svg>
+      </div>
+      <div>
+        <h1>Smart Farm Monitor</h1>
+        <div class="sub" id="device">Waiting for device…</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <div class="pill" id="clock">--:--:--</div>
+      <div class="pill" id="conn"><span class="dot"></span><span id="connText">Disconnected</span></div>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" role="alert">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ff4d6a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+    <div><b>High temperature alarm</b><br><span id="bannerText">Temperature has reached the limit.</span></div>
+  </div>
+
+  <section class="grid">
+    <article class="card temp" id="cardTemp">
+      <div class="label"><i></i>Temperature</div>
+      <div class="gauge">
+        <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="54"/><circle class="bar" id="gTemp" cx="60" cy="60" r="54"/></svg>
+        <div class="val"><div class="num" id="vTemp">--<small>°C</small></div></div>
+      </div>
+      <div class="hint" id="hTemp">Alarm at 33 °C</div>
+    </article>
+
+    <article class="card hum">
+      <div class="label"><i></i>Humidity</div>
+      <div class="gauge">
+        <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="54"/><circle class="bar" id="gHum" cx="60" cy="60" r="54"/></svg>
+        <div class="val"><div class="num" id="vHum">--<small>%</small></div></div>
+      </div>
+      <div class="hint" id="hHum">Air moisture</div>
+    </article>
+
+    <article class="card soil">
+      <div class="label"><i></i>Soil moisture</div>
+      <div class="gauge">
+        <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="54"/><circle class="bar" id="gSoil" cx="60" cy="60" r="54"/></svg>
+        <div class="val"><div class="num" id="vSoil">--<small>%</small></div></div>
+      </div>
+      <div class="hint" id="hSoil">Ground wetness</div>
+    </article>
+
+    <article class="card alarm" id="cardAlarm">
+      <div class="label"><i></i>Alarm</div>
+      <div class="status">
+        <div class="icon" id="alarmIcon"></div>
+        <div class="t" id="alarmTitle">All clear</div>
+        <div class="d" id="alarmDesc">Conditions are normal</div>
+      </div>
+      <button class="mute" id="muteBtn" disabled>Mute alarm</button>
+    </article>
+  </section>
+
+  <section class="row">
+    <div class="card wide">
+      <div class="head">
+        <h2>Trend · last 50 readings</h2>
+        <div class="legend">
+          <span style="--c:var(--temp)">Temperature</span>
+          <span style="--c:var(--hum)">Humidity</span>
+          <span style="--c:var(--soil)">Soil</span>
+        </div>
+      </div>
+      <canvas id="chart" aria-label="Sensor trend chart" role="img"></canvas>
+    </div>
+
+    <div class="card wide">
+      <div class="head"><h2>Reading history</h2><div class="sub" id="count"></div></div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Time</th><th>Device</th><th>Temp</th><th>Humidity</th><th>Soil</th><th>Status</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="6" class="empty">No readings yet</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer>ESP32 · Node.js · SQLite · Live over WebSocket</footer>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const CIRC = 339.3;
+  const TEMP_ALARM = 33;
+  let muted = false, alarmOn = false, deviceOnline = false;
+  let data = []; // oldest -> newest
+
+  const BELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>';
+  const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+  $('alarmIcon').innerHTML = CHECK;
+
+  // Clock
+  setInterval(() => { $('clock').textContent = new Date().toLocaleTimeString(); }, 1000);
+  $('clock').textContent = new Date().toLocaleTimeString();
+
+  function setGauge(id, pct) {
+    const p = Math.max(0, Math.min(100, pct));
+    $(id).style.strokeDashoffset = CIRC * (1 - p / 100);
+  }
+  function parseTime(s) {
+    if (!s) return new Date();
+    return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : s.replace(' ', 'T') + 'Z');
+  }
+  const fmtTime = (s) => parseTime(s).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  function soilHint(p) { return p < 25 ? 'Dry · needs water' : p < 60 ? 'Moist · healthy' : 'Wet · well watered'; }
+  function humHint(p) { return p < 40 ? 'Dry air' : p < 70 ? 'Comfortable' : 'Humid air'; }
+
+  function renderLatest(r) {
+    $('device').textContent = r.device_id + ' · updated ' + parseTime(r.created_at).toLocaleTimeString();
+    $('vTemp').innerHTML = r.temperature.toFixed(1) + '<small>°C</small>';
+    $('vHum').innerHTML = r.humidity.toFixed(1) + '<small>%</small>';
+    $('vSoil').innerHTML = Math.round(r.soil_moisture) + '<small>%</small>';
+    setGauge('gTemp', (r.temperature / 50) * 100);
+    setGauge('gHum', r.humidity);
+    setGauge('gSoil', r.soil_moisture);
+    $('hHum').textContent = humHint(r.humidity);
+    $('hSoil').textContent = soilHint(r.soil_moisture);
+    const hot = !!r.alarm;
+    $('hTemp').textContent = hot ? 'Above the ' + TEMP_ALARM + ' °C limit' : 'Alarm at ' + TEMP_ALARM + ' °C';
+    $('cardTemp').classList.toggle('hot', hot);
+    alarmOn = hot;
+    renderAlarm(r.temperature);
+  }
+
+  function renderAlarm(temp) {
+    $('cardAlarm').classList.toggle('on', alarmOn);
+    $('banner').classList.toggle('show', alarmOn);
+    $('alarmIcon').innerHTML = alarmOn ? BELL : CHECK;
+    $('alarmTitle').textContent = alarmOn ? (muted ? 'Alarm muted' : 'ALARM') : 'All clear';
+    $('alarmDesc').textContent = alarmOn ? (muted ? 'Buzzer is silent' : 'Buzzer is sounding') : 'Conditions are normal';
+    if (alarmOn && temp != null) $('bannerText').textContent = 'Temperature is ' + temp.toFixed(1) + ' °C. The limit is ' + TEMP_ALARM + ' °C.';
+    renderMute();
+  }
+
+  function renderMute() {
+    const b = $('muteBtn');
+    b.textContent = muted ? 'Unmute alarm' : 'Mute alarm';
+    b.classList.toggle('active', alarmOn && !muted);
+    b.disabled = !alarmOn && !muted;
+  }
+
+  $('muteBtn').addEventListener('click', async () => {
+    const b = $('muteBtn');
+    b.disabled = true;
+    try {
+      const r = await fetch('/api/mute', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mute: !muted }) });
+      if (!r.ok) alert('The device is offline');
+    } catch { alert('Could not reach the server'); }
+    renderMute();
+  });
+
+  function renderTable() {
+    const body = $('rows');
+    if (!data.length) { body.innerHTML = '<tr><td colspan="6" class="empty">No readings yet</td></tr>'; $('count').textContent = ''; return; }
+    body.textContent = '';
+    for (const r of [...data].reverse().slice(0, 50)) {
+      const tr = document.createElement('tr');
+      const tt = document.createElement('td');
+      const d = parseTime(r.created_at);
+      const dts = document.createElement('span'); dts.className = 'dt';
+      dts.textContent = d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ';
+      tt.appendChild(dts); tt.appendChild(document.createTextNode(d.toLocaleTimeString()));
+      tr.appendChild(tt);
+      const cells = [r.device_id, r.temperature.toFixed(1) + ' °C', r.humidity.toFixed(1) + ' %', Math.round(r.soil_moisture) + ' %'];
+      for (const c of cells) { const td = document.createElement('td'); td.textContent = c; tr.appendChild(td); }
+      const td = document.createElement('td');
+      const tag = document.createElement('span');
+      tag.className = 'tag ' + (r.alarm ? 'bad' : 'ok');
+      tag.textContent = r.alarm ? 'Alarm' : 'Normal';
+      td.appendChild(tag); tr.appendChild(td);
+      body.appendChild(tr);
+    }
+    $('count').textContent = data.length + ' shown';
+  }
+
+  // Chart (canvas, no libraries)
+  function drawChart() {
+    const cv = $('chart'), dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = w * dpr; cv.height = h * dpr;
+    const g = cv.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0, 0, w, h);
+    const padL = 34, padR = 10, padT = 10, padB = 22;
+    const iw = w - padL - padR, ih = h - padT - padB;
+    g.font = '11px Inter, system-ui, sans-serif'; g.fillStyle = '#8b97a9'; g.strokeStyle = 'rgba(255,255,255,.06)'; g.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (ih * i) / 4;
+      g.beginPath(); g.moveTo(padL, y); g.lineTo(w - padR, y); g.stroke();
+      g.textAlign = 'right'; g.fillText(String(100 - i * 25), padL - 8, y + 4);
+    }
+    if (data.length < 2) { g.textAlign = 'center'; g.fillText('Waiting for more data…', w / 2, h / 2); return; }
+    const series = [['temperature', '#ff8a4c', 100 / 50], ['humidity', '#4cc9f0', 1], ['soil_moisture', '#5eead4', 1]];
+    const n = data.length;
+    for (const [key, color, scale] of series) {
+      const pts = data.map((r, i) => [padL + (iw * i) / (n - 1), padT + ih - Math.min(100, r[key] * scale) / 100 * ih]);
+      const grad = g.createLinearGradient(0, padT, 0, padT + ih);
+      grad.addColorStop(0, color + '33'); grad.addColorStop(1, color + '00');
+      g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+      g.lineTo(pts[n - 1][0], padT + ih); g.lineTo(pts[0][0], padT + ih); g.closePath(); g.fillStyle = grad; g.fill();
+      g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+      g.strokeStyle = color; g.lineWidth = 2.2; g.lineJoin = 'round'; g.stroke();
+      const [lx, ly] = pts[n - 1];
+      g.beginPath(); g.arc(lx, ly, 4, 0, 7); g.fillStyle = color; g.fill();
+    }
+    g.fillStyle = '#8b97a9'; g.textAlign = 'left'; g.fillText(parseTime(data[0].created_at).toLocaleTimeString(), padL, h - 4);
+    g.textAlign = 'right'; g.fillText(parseTime(data[n - 1].created_at).toLocaleTimeString(), w - padR, h - 4);
+    g.fillStyle = 'rgba(255,138,76,.8)'; g.textAlign = 'left'; g.fillText('Temp scaled 0–50 °C', padL + 8, padT + 12);
+  }
+  // Redraw whenever the chart's size changes (rotation, window resize, phone address bar)
+  if ('ResizeObserver' in window) new ResizeObserver(() => drawChart()).observe($('chart').parentElement);
+  else window.addEventListener('resize', drawChart);
+  window.addEventListener('orientationchange', () => setTimeout(drawChart, 200));
+
+  async function loadHistory() {
+    try {
+      const res = await fetch('/api/readings?limit=50');
+      const rows = await res.json();
+      data = rows.reverse();
+      if (data.length) renderLatest(data[data.length - 1]);
+      renderTable(); drawChart();
+    } catch (e) { console.error(e); }
+  }
+
+  function setConn(on) {
+    $('conn').classList.toggle('live', on);
+    $('connText').textContent = on ? 'Live' : 'Disconnected';
+  }
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(proto + '://' + location.host + '/live');
+    ws.onopen = () => setConn(true);
+    ws.onclose = () => { setConn(false); setTimeout(connect, 3000); };
+    ws.onerror = () => ws.close();
+    ws.onmessage = (e) => {
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.type === 'mute_state') { muted = !!m.muted; renderAlarm(data.length ? data[data.length - 1].temperature : null); }
+      if (m.type === 'reading') {
+        muted = !!m.muted;
+        data.push(m); if (data.length > 50) data.shift();
+        renderLatest(m); renderTable(); drawChart();
+      }
+    };
+  }
+
+  loadHistory();
+  connect();
+</script>
+</body>
+</html>
